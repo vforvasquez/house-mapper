@@ -31,3 +31,11 @@ coverage
 
 test-results/
 playwright-report/
+data/
+scripts/myenv
+
+.env
+
+public/data
+
+TODO
