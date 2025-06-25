@@ -3,6 +3,18 @@ from bs4 import BeautifulSoup
 import re
 import os
 
+def load_existing_houses(filename):
+    """Load existing houses from JSON file if it exists."""
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"No existing file found at '{filename}'. Starting fresh.")
+        return {}
+    except Exception as e:
+        print(f"Error loading existing houses from '{filename}': {str(e)}")
+        return {}
+
 def parse_house_data(html_file):
     # Read HTML content from file
     try:
@@ -18,7 +30,7 @@ def parse_house_data(html_file):
     # Create BeautifulSoup object
     soup = BeautifulSoup(html_content, 'html.parser')
     
-    # Dictionary to store all houses
+    # Dictionary to store houses from this parse
     houses = {}
     
     # Find property cards with data-test="PropertyListCard-wrapper"
@@ -29,12 +41,8 @@ def parse_house_data(html_file):
     seen_mls_ids = set()
     
     for i, card in enumerate(property_cards, 1):
-        if valid_cards_processed >= 12:
-            print(f"Stopping after processing 12 valid cards.")
-            break
-            
         try:
-            print(f"Processing card {i}")
+            # print(f"Processing card {i}")
             house_data = {}
             
             # Extract Image
@@ -43,18 +51,11 @@ def parse_house_data(html_file):
             if img and img.get('src'):
                 img_src = img.get('src')
                 if 'listCardFallBackImage' in img_src:
-                    print(f"Card {i}: Found placeholder image, treating as no image")
+                    # print(f"Card {i}: Found placeholder image, treating as no image")
                     img_src = ''
-                else:
-                    print(f"Card {i}: Found image: {img_src}")
             else:
-                print(f"Card {i}: No img tag found. Trying deeper search...")
-                imgs = card.find_all('img')
-                if imgs and imgs[0].get('src') and 'listCardFallBackImage' not in imgs[0].get('src'):
-                    img_src = imgs[0].get('src')
-                    print(f"Card {i}: Found image in deeper search: {img_src}")
-                else:
-                    print(f"Card {i}: No valid images found")
+                print(f"cannot find image for {i}")
+                
             house_data['image'] = img_src
             
             # Extract Price
@@ -83,7 +84,7 @@ def parse_house_data(html_file):
             
             # Extract Details URL
             link = card.find('a', class_=re.compile('StyledPropertyCardDataArea'))
-            house_data['details_url'] = link['href'] if link and 'href' in link.attrs else ''
+            house_data['details_url'] = f"https://www.zillow.com/{link['href']}" if link and 'href' in link.attrs else ''
             
             # Extract Address
             address = link.find('address') if link else None
@@ -96,7 +97,7 @@ def parse_house_data(html_file):
                 mls_text = mls.text.strip()
                 digits = ''.join(re.findall(r'\d+', mls_text))
                 mls_id = digits if digits else ''
-                print(f"Card {i}: MLS ID: {mls_id} (from text: {mls_text})")
+                # print(f"Card {i}: MLS ID: {mls_id} (from text: {mls_text})")
             else:
                 print(f"Card {i}: No MLS ID found")
             
@@ -105,7 +106,7 @@ def parse_house_data(html_file):
                 houses[mls_id] = house_data
                 seen_mls_ids.add(mls_id)
                 valid_cards_processed += 1
-                print(f"Card {i}: Added house with MLS ID {mls_id}")
+                # print(f"Card {i}: Added/Updated house with MLS ID {mls_id}")
             else:
                 print(f"Card {i}: Skipped (No MLS ID or duplicate MLS ID)")
                 
@@ -117,10 +118,37 @@ def parse_house_data(html_file):
     return houses
 
 def save_to_json(data, filename):
-    # Ensure the output directory exists
+    """Save data to JSON file."""
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
+
+def update_and_save_houses(new_houses, output_file):
+    print(f"new_houses: {len(new_houses)}")
+    """Load existing houses, update with new data, and save."""
+    # Load existing houses
+    existing_houses = load_existing_houses(output_file)
+    print(f"existing houses: {len(existing_houses)}")
+    
+    # Update existing houses and append new ones
+    updated_count = 0
+    new_count = 0
+    
+    for mls_id, house_data in new_houses.items():
+        print(f"mls_id: {mls_id}")
+        if mls_id in existing_houses:
+            existing_houses[mls_id].update(house_data)
+            updated_count += 1
+            # print(f"Updated house with MLS ID {mls_id}")
+        else:
+            existing_houses[mls_id] = house_data
+            new_count += 1
+            # print(f"Added new house with MLS ID {mls_id}")
+    
+    print(f"\nUpdated {updated_count} existing houses and added {new_count} new houses")
+    
+    # Save the updated houses
+    save_to_json(existing_houses, output_file)
 
 # Main execution
 if __name__ == "__main__":
@@ -131,4 +159,4 @@ if __name__ == "__main__":
     output_file = os.path.join(data_dir, 'saved_houses.json')
     
     house_data = parse_house_data(input_file)
-    save_to_json(house_data, output_file)
+    update_and_save_houses(house_data, output_file)

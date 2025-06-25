@@ -7,7 +7,7 @@ const fetchError = ref('')
 
 onMounted(async () => {
   try {
-    const response = await fetch('/data/saved_houses.json')
+    const response = await fetch('/data/houses.json')
     console.log('Fetch response status:', response.status, response.ok)
     if (!response.ok) throw new Error(`Failed to fetch houses: ${response.status}`)
     houseData.value = await response.json()
