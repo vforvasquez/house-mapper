@@ -24,3 +24,10 @@ Since I'm only running this locally I am not spending time on optimizing builds 
 ```sh
 npm run dev
 ```
+
+### TODO
+
+- Filtering
+- Search
+- Custom Tags
+- Collections
