@@ -51,50 +51,6 @@ if (!apiKey) {
   error.value = 'Map configuration error: Missing API key. Please contact support.'
 }
 
-// Normalize address for better geocoding
-const normalizeAddress = (address) => {
-  if (!address) return address
-  let normalized = address.trim()
-  const replacements = {
-    Rd: 'Road',
-    Ln: 'Lane',
-    Dr: 'Drive',
-    St: 'Street',
-    Ave: 'Avenue',
-    Blvd: 'Boulevard',
-    Hwy: 'Highway',
-    Ct: 'Court',
-  }
-  for (const [key, value] of Object.entries(replacements)) {
-    normalized = normalized.replace(new RegExp(`\\b${key}\\b`, 'gi'), value)
-  }
-  return normalized
-}
-
-// Geocode an address using Google Maps Geocoding API
-const geocodeAddress = async (address) => {
-  try {
-    const normalizedAddress = normalizeAddress(address)
-    const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
-      params: {
-        address: normalizedAddress,
-        key: apiKey,
-      },
-    })
-    if (response.data.status === 'OK' && response.data.results.length > 0) {
-      const { lat, lng } = response.data.results[0].geometry.location
-      return { lat, lng }
-    }
-    console.warn(
-      `No geocoding result for address: ${address} (normalized: ${normalizedAddress}, status: ${response.data.status})`,
-    )
-    return null
-  } catch (err) {
-    console.error(`Geocoding error for address ${address}:`, err.message, err.response?.data)
-    return null
-  }
-}
-
 // Initialize the Google Map
 const initMap = () => {
   const mapElement = document.getElementById('map')
@@ -179,7 +135,7 @@ const addHousesToMap = async () => {
     if (house.latitude && house.longitude) {
       coords = { lat: house.latitude, lng: house.longitude }
     } else {
-      coords = await geocodeAddress(fullAddress)
+      console.error(`Failed to create marker for house ${zpid}:`, 'Missing lat/long')
     }
 
     if (!coords) {
